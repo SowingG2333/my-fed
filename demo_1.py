@@ -13,45 +13,42 @@ class AdamFreeRider:
         self.cid = cid
         self.model = copy.deepcopy(global_model)
         self.optimzier = optim.Adam(self.model.parameters(), lr, adam_params)
-        self.delta_0 = {}
         self.alpha, self.beta = adam_params[0], adam_params[1]
+        self.fake_gradients = {}
 
     def generate_fake_grad(self, round_num, global_model):
         """生成虚假梯度更新，并返回更新后的模型参数与更新梯度"""
         # 加载全局模型
         self.model.load_state_dict(global_model.state_dict())
         # 生成噪声梯度
-        update_dict = self.adaptive_perturbation(round_num, self.alpha, self.beta)
+        update_named_param_dict = self.adaptive_perturbation(round_num)
 
-        return self.model.state_dict(), update_dict
+        return self.model.state_dict(), update_named_param_dict
 
-    def adaptive_perturbation(self, round_num, alpha, beta):
+    def adaptive_perturbation(self, round_num):
         """生成根据adam优化器公式的梯度更新"""
-        fake_gradients = {}
-
         for name, param in self.model.named_parameters():
             if round_num == 0:
                 # 生成首轮噪声梯度
                 noise = torch.rand_like(param)
                 param.grad = noise
-                fake_gradients[name] = noise
-                self.delta_0 = fake_gradients
+                self.fake_gradients[name] = noise
 
             else:
             # 生成融合梯度
-                base_grad = self.delta_0[name] * alpha
-                noise = torch.randn_like(param) * beta
+                base_grad = self.fake_gradients[name] * self.alpha
+                noise = torch.randn_like(param) * self.beta
                 fake_grad = base_grad + noise
 
                 # 梯度赋值
-                param.grad = fake_grad
-                fake_gradients[name] = fake_grad
+                param.grad = noise
+                self.fake_gradients[name] = fake_grad
 
         # 执行Adam优化器更新
         self.optimzier.step()
         self.optimzier.zero_grad()
 
-        return fake_gradients
+        return self.fake_gradients
 
 class NormalClient:
     """正常客户端训练器"""
@@ -163,7 +160,6 @@ class FedModel(nn.Module):
         x = self.flatten(x)
         return self.layers(x)
 
-# 非独立同分布数据划分
 def non_iid_split(dataset, num_clients, classes_per_client=2):
     labels = np.array(dataset.targets)
     class_indices = [np.where(labels == i)[0] for i in range(10)]
