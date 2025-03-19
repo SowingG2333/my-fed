@@ -11,16 +11,7 @@ class AdamFreeRider:
         self.alpha, self.beta = adam_params[0], adam_params[1]
         self.fake_gradients = {}
 
-    def generate_fake_grad(self, round_num, global_model):
-        """生成虚假梯度更新，并返回更新后的模型参数与更新梯度"""
-        # 加载全局模型
-        self.model.load_state_dict(global_model.state_dict())
-        # 生成噪声梯度
-        update_named_param_dict = self.adaptive_perturbation(round_num)
-
-        return self.model.state_dict(), update_named_param_dict
-
-    def adaptive_perturbation(self, round_num):
+    def generate_fake_grad(self, round_num):
         """生成根据adam优化器公式的梯度更新"""
         for name, param in self.model.named_parameters():
             if round_num == 0:
@@ -53,5 +44,5 @@ if __name__ == '__main__':
     adam_cli = AdamFreeRider(global_model=model, cid=0, lr=0.01, adam_params=(0.8, 0.1))
 
     for round_num in range(3):
-        print(f"{round_num}\n")
-        fake_gradients = adam_cli.adaptive_perturbation(round_num)
+        print(f"{round_num}")
+        fake_gradients = adam_cli.generate_fake_grad(round_num)
