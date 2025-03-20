@@ -30,7 +30,7 @@ class CosineDefender:
                                              dim=1).item(), 3)
             
             if similarity < self.cos_threshold:
-                malicious.append((self.c_ids[i], similarity))
+                malicious.append((int(self.c_ids[i]), similarity))  # 注意此处转化为int类型
         
         return malicious    # 返回形式 [(id, 相似度分数)...]
 

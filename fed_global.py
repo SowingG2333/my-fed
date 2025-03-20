@@ -21,7 +21,7 @@ class FedModel(nn.Module):
         return self.layers(x)
     
 # 非独立同分布数据划分
-def non_iid_split(dataset, num_clients, classes_per_client=5):
+def non_iid_split(dataset, num_clients, classes_per_client=2):
     labels = np.array(dataset.targets)
     class_indices = [np.where(labels == i)[0] for i in range(10)]
     
