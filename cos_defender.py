@@ -1,5 +1,5 @@
 import torch                                # 引入torch模块
-import torch.functional as F                # 引入torch的函数模块
+import torch.nn.functional as F                # 引入torch的函数模块
 
 class CosineDefender:
     """基于余弦相似度计算的搭便车攻击防御器"""
@@ -25,9 +25,9 @@ class CosineDefender:
             client_vector = torch.cat([v.flatten() for v in client_grad.values()]).detach()
             
             # 计算余弦相似度
-            similarity = F.cosine_similarity(avg_vector.unsqueeze(0), 
+            similarity = round(F.cosine_similarity(avg_vector.unsqueeze(0), 
                                              client_vector.unsqueeze(0), 
-                                             dim=1).item()
+                                             dim=1).item(), 3)
             
             if similarity < self.cos_threshold:
                 malicious.append((self.c_ids[i], similarity))

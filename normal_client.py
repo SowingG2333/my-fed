@@ -16,8 +16,8 @@ class NormalClient:
 
     def local_train(self):
         """执行本地训练并返回梯度更新"""
-        # 保留初始参数（注意使用的named_parameters而不是state_dict）
-        initial_params = copy.deepcopy(self.local_model.named_parameters())
+        # 保留初始参数（注意使用的是state_dict）
+        initial_params = copy.deepcopy(self.local_model.state_dict())
         
         # 训练过程
         self.local_model.train()
@@ -31,7 +31,7 @@ class NormalClient:
         
         # 计算梯度更新（当前参数与初始参数的差值）
         grad_update = {
-            name: initial_params[name] - self.local_model.named_parameters()[name] 
+            name: initial_params[name] - self.local_model.state_dict()[name] 
             for name in initial_params.keys()
         }
         return grad_update
