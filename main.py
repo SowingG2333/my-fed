@@ -32,10 +32,10 @@ def data_generate(num_clients, non_iid=True):
 # test
 if __name__ == '__main__':
     '''全局参数定义'''
-    NUM_CLIENTS = 10                 # 客户端总数
-    MALICIOUS_RATIO = 0.2            # 恶意客户端比例
-    NUM_ROUNDS = 30                  # 联邦训练轮次
-    CHOOSE_PERCENTAGE = 0.5          # 每轮学习参与率
+    NUM_CLIENTS = 100                # 客户端总数
+    MALICIOUS_RATIO = 0.25           # 恶意客户端比例
+    NUM_ROUNDS = 1                   # 联邦训练轮次
+    CHOOSE_PERCENTAGE = 1            # 每轮学习参与率
     COS_THRESHOLD = 0.5              # 防御阈值
     LOCAL_EPOCHS = 30                # 本地训练轮次
     BATCH_SIZE = 64                  # 本地训练批次大小
@@ -109,7 +109,7 @@ if __name__ == '__main__':
         # 衡量防御性能
         detected_count = 0
         for detected_fr_client in detected_results:
-            if all_clients[detected_fr_client.key()]['type'] == 'fr':
+            if all_clients[detected_fr_client]['type'] == 'fr':
                 detected_count += 1
         detected_ratio = detected_count / (NUM_CLIENTS * MALICIOUS_RATIO)
         print(detected_ratio)
