@@ -1,4 +1,4 @@
-from adam_FR import AdamFreeRider                                       # 引入adam优化器搭便车攻击模块
+from adam_FR_old import AdamFreeRider                                   # 引入adam优化器搭便车攻击模块
 from normal_client import NormalClient                                  # 引入正常客户端模块
 from fed_global import FedModel, non_iid_split, split_dataset_randomly  # 引入全局模型架构与非独立同分布数据划分
 from cos_defender import CosineDefender                                 # 引入余弦相似度检测器
@@ -91,7 +91,7 @@ if __name__ == '__main__':
             if current_client['type'] == 'fr':
                 grad = current_client['trainer'].generate_fake_grad(round_num)
             else:
-                grad = current_client['trainer'].local_train()
+                _, grad = current_client['trainer'].local_train()
 
             # 记录梯度更新
             update_grads.append(grad)

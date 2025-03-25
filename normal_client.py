@@ -65,8 +65,7 @@ class NormalClient:
         # 保留初始参数（深拷贝state_dict）
         initial_params = copy.deepcopy(self.local_model.state_dict())
         
-        # 训练过程（仅更新最后一层）
-        self.local_model.train()
+        # 训练过程（返回最后一层更新）
         for _ in range(self.local_epochs):
             for X, y in self.loader:
                 self.optimizer.zero_grad()
@@ -81,4 +80,4 @@ class NormalClient:
             name: initial_params[name] - final_params[name]
             for name in self.last_layer_params
         }
-        return grad_update
+        return self.local_model.state_dict(), grad_update
