@@ -81,3 +81,10 @@ class NormalClient:
             for name in self.last_layer_params
         }
         return self.local_model.state_dict(), grad_update
+    
+    def update_global_model(self, new_global_state):
+        """更新本地模型参数（不替换张量对象）"""
+        local_state = self.local_model.state_dict()
+        for key in new_global_state:
+            if key in local_state:
+                local_state[key].data.copy_(new_global_state[key])

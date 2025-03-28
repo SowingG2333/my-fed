@@ -1,4 +1,4 @@
-import random                           # 引入随机模块
+import torch                            # 引入torch库
 import numpy as np                      # 引入numpy库
 import torch.nn as nn                   # 引入torch的神经网络模块
 from torch.utils.data import Subset     # 引入torch的子数据集模块
@@ -20,12 +20,53 @@ class FedModel(nn.Module):
         x = self.flatten(x)
         return self.layers(x)
     
-# 非独立同分布数据划分
-def non_iid_split(dataset, num_clients, classes_per_client=10):
-    labels = np.array(dataset.targets)
-    class_indices = [np.where(labels == i)[0] for i in range(10)]
+import numpy as np
+import torch
+import torchvision
+from torchvision.datasets import MNIST
+from torch.utils.data import Subset, random_split
+
+def data_split(num_clients):
+    # 加载原始MNIST数据集
+    full_dataset = MNIST(
+        root='./data',
+        train=True,
+        download=True,
+        transform=torchvision.transforms.ToTensor()
+    )
     
+    # 划分训练验证集 (80%训练，20%验证)
+    train_size = int(0.8 * len(full_dataset))
+    test_size = len(full_dataset) - train_size
+    train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
+    
+    # 对训练集进行非独立同分布划分
+    client_datasets = non_iid_split(train_dataset, num_clients)
+    
+    return client_datasets, test_dataset
+
+def non_iid_split(dataset, num_clients, classes_per_client=10):
+    """支持原始Dataset和Subset的统一处理"""
+    # 获取实际数据引用和索引
+    if isinstance(dataset, Subset):
+        main_dataset = dataset.dataset
+        indices = dataset.indices
+    else:
+        main_dataset = dataset
+        indices = np.arange(len(dataset))
+    
+    # 获取标签数据（兼容不同数据集结构）
+    if hasattr(main_dataset, 'targets'):
+        labels = np.array(main_dataset.targets)[indices]
+    elif hasattr(main_dataset, 'labels'):
+        labels = np.array(main_dataset.labels)[indices]
+    else:
+        raise AttributeError("Dataset missing both 'targets' and 'labels' attributes")
+    
+    # 非独立同分布划分逻辑
+    class_indices = [np.where(labels == i)[0] for i in range(10)]
     client_indices = []
+    
     for _ in range(num_clients):
         selected_classes = np.random.choice(10, classes_per_client, replace=False)
         indices = []
@@ -34,42 +75,4 @@ def non_iid_split(dataset, num_clients, classes_per_client=10):
             indices.extend(np.random.choice(class_indices[cls], take_num, replace=False))
         client_indices.append(indices)
     
-    return [Subset(dataset, indices) for indices in client_indices]
-
-# 均匀数据划分
-def split_dataset_randomly(dataset, num_clients):
-    """
-    将数据集随机分配给多个客户端，并返回每个客户端的数据子集
-    :param dataset: 原始数据集
-    :param num_clients: 客户端数量
-    :return: 每个客户端的数据子集列表
-    """
-    data_size = len(dataset)
-    indices = list(range(data_size))
-    random.shuffle(indices)  # 随机打乱索引
-
-    # 计算每个客户端应分配的平均数据量
-    avg_size = data_size // num_clients
-    client_data_sizes = [avg_size] * num_clients
-
-    # 在平均数据量的基础上，添加一定的随机性
-    for i in range(data_size % num_clients):
-        client_data_sizes[i] += 1                               # 分配剩余的数据
-
-    # 确保每个客户端的数据量在一定范围内波动
-    for i in range(num_clients):
-        if i < num_clients - 1:
-            fluctuation = random.randint(-avg_size // 2, avg_size // 2)
-            client_data_sizes[i] += fluctuation
-            client_data_sizes[-1] -= fluctuation
-
-    client_datasets = []
-    start_idx = 0
-    for size in client_data_sizes:
-        end_idx = start_idx + size
-        client_indices = indices[start_idx:end_idx]
-        client_subset = [dataset[i] for i in client_indices]    # 直接获取数据子集
-        client_datasets.append(client_subset)
-        start_idx = end_idx
-
-    return client_datasets                                      # 返回每个客户端的数据子集列表
+    return [Subset(main_dataset, indices) for indices in client_indices]

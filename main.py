@@ -1,12 +1,12 @@
 from adam_FR_old import AdamFreeRider                                   # 引入adam优化器搭便车攻击模块
 from normal_client import NormalClient                                  # 引入正常客户端模块
-from fed_global import FedModel, non_iid_split, split_dataset_randomly  # 引入全局模型架构与非独立同分布数据划分
+from fed_global import FedModel, non_iid_split                           # 引入全局模型架构与非独立同分布数据划分
 from cos_defender import CosineDefender                                 # 引入余弦相似度检测器
 from torchvision import datasets, transforms                            # 引入torchvision的数据集与变换模块
 import numpy as np                                                      # 引入numpy模组
 
 # 数据划分
-def data_generate(num_clients, non_iid=True):
+def data_generate(num_clients):
     # 使用MNIST数据集并进行预处理归一化
     transform = transforms.Compose([
     transforms.ToTensor(),
@@ -22,10 +22,7 @@ def data_generate(num_clients, non_iid=True):
     )
 
     # 划分非独立同分布客户端数据集
-    if non_iid == True:
-        client_datasets = non_iid_split(full_dataset, num_clients)
-    else:
-        client_datasets = split_dataset_randomly(full_dataset, num_clients)
+    client_datasets = non_iid_split(full_dataset, num_clients)
 
     return client_datasets
 
