@@ -105,13 +105,12 @@ def evaluate_model(model, dataloader, criterion, device='cpu'):
             
     return total_loss / total, correct / total
 
-from fed_global import data_split
+from fed_global import data_generate
 
 if __name__ == '__main__':
     # 初始化环境
     from fed_global import FedModel
     from normal_client import NormalClient
-    from main import data_generate
 
     global_model = FedModel()
     criterion = torch.nn.CrossEntropyLoss() 
@@ -126,8 +125,8 @@ if __name__ == '__main__':
     normal_clients = []
 
     num_clients = 5
-    datasets = data_generate(num_clients)
-    client_datasets, test_dataset = data_split(num_clients)
+    diri_alpha = 0.5
+    client_datasets, test_dataset = data_generate(num_clients, diri_alpha)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
     for cid in range(num_clients):
         normal_clients.append(NormalClient(cid, 
@@ -137,7 +136,7 @@ if __name__ == '__main__':
                                            local_epochs=10, 
                                            dataset=client_datasets[cid]))
     # 模拟联邦学习
-    for round_num in range(10):
+    for round_num in range(50):
         print(f"\n=== Round {round_num} ===")
         real_grads = []
         client_updates = []
@@ -185,6 +184,18 @@ if __name__ == '__main__':
                 avg_real_grads[name] += grad.clone()
         for name in avg_real_grads:
             avg_real_grads[name] = avg_real_grads[name] / len(real_grads)
+
+        # 计算真实梯度的标准差（跨客户端维度）
+        real_grad_stds = {}
+        for name in avg_real_grads:
+            # 收集所有客户端的梯度
+            all_grads = [client_grad[name] for client_grad in real_grads]
+            # 沿着客户端维度计算标准差
+            real_grad_stds[name] = torch.stack(all_grads).std(dim=0)
+
+        # 计算虚假梯度的标准差
+        fake_grad_stds = {name: torch.std(grad) for name, grad in fake_grads.items()}
+
         
         # 遍历所有参数比较梯度
         for param_name in fake_grads:
@@ -192,6 +203,8 @@ if __name__ == '__main__':
                 # 确保设备一致
                 avg_real_grad = avg_real_grads[param_name].to(fake_grads[param_name].device)
                 fake_grad = fake_grads[param_name]
+                real_std = real_grad_stds.get(param_name, torch.tensor(0.0))
+                fake_std = fake_grad_stds.get(param_name, torch.tensor(0.0))
                 
                 sim = cosine_similarity(avg_real_grad, fake_grad)
                 total_sim += sim
@@ -199,7 +212,19 @@ if __name__ == '__main__':
                 print(f"[{param_name}]")
                 print(f"  Cosine Similarity: {sim:.4f}")
                 print(f"  Real Grad Norm: {avg_real_grad.norm().item():.4f}")
+                
+                if real_std.numel() > 1:
+                    real_std_print = real_std.mean().item()
+                else:
+                    real_std_print = real_std.item()
+                print(f"  Real Grad Std: {real_std_print:.4f}") 
                 print(f"  Fake Grad Norm: {fake_grad.norm().item():.4f}")
+
+                if fake_std.numel() > 1:
+                    fake_std_print = fake_std.mean().item()
+                else:
+                    fake_std_print = fake_std.item()
+                print(f"  Fake Grad Std: {fake_std.item():.4f}")    # 新增标准差输出
 
         # 输出平均相似度
         if valid_params > 0:

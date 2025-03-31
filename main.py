@@ -1,30 +1,8 @@
 from adam_FR_old import AdamFreeRider                                   # 引入adam优化器搭便车攻击模块
 from normal_client import NormalClient                                  # 引入正常客户端模块
-from fed_global import FedModel, non_iid_split                           # 引入全局模型架构与非独立同分布数据划分
-from cos_defender import CosineDefender                                 # 引入余弦相似度检测器
-from torchvision import datasets, transforms                            # 引入torchvision的数据集与变换模块
+from fed_global import FedModel, data_generate                          # 引入全局模型架构与非独立同分布数据划分
+from cos_defender import CosineDefender                                 # 引入余弦相似度检测器s
 import numpy as np                                                      # 引入numpy模组
-
-# 数据划分
-def data_generate(num_clients):
-    # 使用MNIST数据集并进行预处理归一化
-    transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.1307,), (0.3081,))
-    ])
-
-    # 加载完整数据集
-    full_dataset = datasets.MNIST(
-        root='./data',
-        train=True,
-        download=True,
-        transform=transform
-    )
-
-    # 划分非独立同分布客户端数据集
-    client_datasets = non_iid_split(full_dataset, num_clients)
-
-    return client_datasets
 
 # test
 if __name__ == '__main__':
@@ -40,7 +18,7 @@ if __name__ == '__main__':
     ATTACK_PARAMS = (0.8, 0.1)       # 攻击参数(α, β)
 
     # 数据集划分与实例化
-    non_iid_datasets = data_generate(NUM_CLIENTS)
+    non_iid_datasets = data_generate(NUM_CLIENTS, diri_alpha=0.1)
     global_model = FedModel()
     defender = CosineDefender(NUM_CLIENTS * CHOOSE_PERCENTAGE, COS_THRESHOLD, global_model)
 
