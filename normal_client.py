@@ -20,13 +20,13 @@ class NormalClient:
         last_layer_parameters = [param for name, param in self.local_model.named_parameters() 
                                 if name in self.last_layer_params]
         
-        self.optimizer = optim.SGD(last_layer_parameters, lr=lr)
-        # self.optimizer = optim.Adam(
-        #     self.local_model.parameters(),
-        #     lr=lr,
-        #     betas=betas,
-        #     eps=eps,
-        # )
+        # self.optimizer = optim.SGD(last_layer_parameters, lr=lr)
+        self.optimizer = optim.Adam(
+            self.local_model.parameters(),
+            lr=lr,
+            betas=betas,
+            eps=eps,
+        )
         
         self.criterion = nn.CrossEntropyLoss()
         self.loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)

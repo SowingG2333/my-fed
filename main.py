@@ -32,12 +32,10 @@ def evaluate_model(model, dataloader, criterion, device='cpu'):
             
     return total_loss / total, correct / total
 
-from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
 import numpy as np
 
-# 新增余弦相似度跟踪功能
-def track_similarities(history, round_grads, round_num):
+def track_similarities(history, round_grads):
     """记录搭便车者与归一化后的真实客户端平均梯度的余弦相似度"""
     # 获取所有正常客户端的梯度
     normal_grads = [grad.clone() for grad in round_grads['normal'].values()]
@@ -63,17 +61,19 @@ def track_similarities(history, round_grads, round_num):
     free_rider_grad = round_grads['free_rider'].clone()
     fr_norm = free_rider_grad.norm(p=2)
     free_rider_grad_normalized = free_rider_grad / fr_norm if fr_norm > 0 else free_rider_grad
-    
-    # 5. 计算余弦相似度
-    sim = torch.dot(avg_normal_grad_normalized, free_rider_grad_normalized).item()
-    
-    # 存储统计量（确保总是追加到列表）
-    history['similarity']['rounds'].append(round_num)
-    history['similarity']['values'].append(sim)  # 现在每个轮次存储单个值
 
-# 修改后的主程序
+
+    # 5. 计算余弦相似度
+    adam_sim = torch.dot(avg_normal_grad_normalized, free_rider_grad_normalized).item()
+    history['similarity']['free_rider'].append(adam_sim)
+    cid = 0
+    for normal_grad in normalized_grads:
+        normal_sim = torch.dot(normal_grad, avg_normal_grad_normalized).item()
+        history['similarity']['normal'][cid].append(normal_sim)
+        cid += 1
+
 if __name__ == '__main__':
-    # 初始化环境（保持不变）
+    # 初始化环境
     from fed_global import FedModel
     from normal_client import NormalClient
 
@@ -100,7 +100,7 @@ if __name__ == '__main__':
                                         betas=(0.9, 0.999),
                                         eps=1e-8,
                                         batch_size=64, 
-                                        local_epochs=10, 
+                                        local_epochs=1, 
                                         dataset=client_datasets[cid]))
     
     # 修正后的数据存储结构
@@ -109,13 +109,9 @@ if __name__ == '__main__':
             'normal': {cid: [] for cid in range(num_clients)},
             'free_rider': []
         },
-        'stds': {
+        'similarity': {
             'normal': {cid: [] for cid in range(num_clients)},
             'free_rider': []
-        },
-        'similarity': {
-            'rounds': [],    # 存储轮次序号
-            'values': []     # 存储每轮单个相似度值
         },
         'test_acc': [],
         'test_loss': []
@@ -138,7 +134,6 @@ if __name__ == '__main__':
             last_layer_grad = torch.cat([grad.flatten() for name, grad in real_grad.items() 
                                       if name in free_rider.last_layer_params])
             history['norms']['normal'][cid].append(last_layer_grad.norm().item())
-            history['stds']['normal'][cid].append(last_layer_grad.std().item())
             round_grads['normal'][cid] = last_layer_grad
 
         # 参数聚合
@@ -163,32 +158,15 @@ if __name__ == '__main__':
         fake_grads = free_rider.generate_fake_grad(round_num)
         last_layer_grad = torch.cat([grad.flatten() for name, grad in fake_grads.items()])
         history['norms']['free_rider'].append(last_layer_grad.norm().item())
-        history['stds']['free_rider'].append(last_layer_grad.std().item())
         round_grads['free_rider'] = last_layer_grad
         
         # 计算并存储相似度
-        if round_grads['normal']:  # 确保有正常客户端数据
-            # 计算归一化平均梯度
-            normal_grads = [grad.clone() for grad in round_grads['normal'].values()]
-            normalized_grads = [g/g.norm() if g.norm() > 0 else g for g in normal_grads]
-            avg_normal_grad = torch.stack(normalized_grads).mean(dim=0)
-            avg_normal_grad /= avg_normal_grad.norm() if avg_normal_grad.norm() > 0 else 1
-            
-            # 处理搭便车者梯度
-            fr_grad = round_grads['free_rider'].clone()
-            fr_grad /= fr_grad.norm() if fr_grad.norm() > 0 else 1
-            
-            # 计算余弦相似度
-            sim = torch.dot(avg_normal_grad, fr_grad).item()
-            
-            # 存储数据
-            history['similarity']['rounds'].append(round_num)
-            history['similarity']['values'].append(sim)
+        track_similarities(history, round_grads)
 
     # 修正后的可视化代码
     plt.figure(figsize=(15, 12))
     
-    # 梯度范数趋势（保持不变）
+    # 梯度范数趋势
     plt.subplot(3, 2, 1)
     for cid in range(num_clients):
         plt.plot(history['norms']['normal'][cid], 'b-', alpha=0.3)
@@ -197,28 +175,17 @@ if __name__ == '__main__':
     plt.xlabel('Training Round')
     plt.ylabel('Norm')
     
-    # 梯度标准差趋势（保持不变）
+    # 余弦相似度趋势
     plt.subplot(3, 2, 2)
     for cid in range(num_clients):
-        plt.plot(history['stds']['normal'][cid], 'b-', alpha=0.3)
-    plt.plot(history['stds']['free_rider'], 'r--', linewidth=2)
-    plt.title('Gradient Standard Deviations')
-    plt.xlabel('Training Round')
-    plt.ylabel('Std')
-    
-    # 修正后的余弦相似度趋势
-    plt.subplot(3, 2, 3)
-    plt.plot(history['similarity']['rounds'], 
-            history['similarity']['values'],
-            'b-', label='Similarity')
-    plt.axhline(y=0, color='gray', linestyle='--')
-    plt.title('Cosine Similarity to Normalized Average')
+        plt.plot(history['similarity']['normal'][cid], 'b-', alpha=0.3)
+    plt.plot(history['similarity']['free_rider'], 'r--', linewidth=2)
+    plt.title('Cosine Similarity to Normalized Average\n(Blue: Normal Clients, Red: Free Rider)')
     plt.xlabel('Training Round')
     plt.ylabel('Similarity')
-    plt.legend()
     
-    # 模型性能（保持不变）
-    plt.subplot(3, 2, 4)
+    # 模型性能
+    plt.subplot(3, 2, 3)
     plt.plot(history['test_acc'], 'g-', label='Accuracy')
     plt.plot(history['test_loss'], 'm--', label='Loss')
     plt.title('Model Performance')
@@ -229,7 +196,7 @@ if __name__ == '__main__':
     plt.subplot(3, 2, 5)
     stats_text = (
         f"Final Metrics:\n"
-        f"Final Similarity: {history['similarity']['values'][-1]:.3f}\n"
+        f"Final Similarity: {history['similarity']['free_rider'][-1]:.3f}\n"
         f"Free Rider Norm: {history['norms']['free_rider'][-1]:.2f}\n"
         f"Normal Clients Avg Norm: {np.mean([v[-1] for v in history['norms']['normal'].values()]):.2f}\n"
         f"Test Accuracy: {history['test_acc'][-1]*100:.1f}%"
@@ -239,8 +206,8 @@ if __name__ == '__main__':
     plt.axis('off')
     
     # 修正后的相似度分布直方图
-    plt.subplot(3, 2, 6)
-    plt.hist(history['similarity']['values'], bins=20, color='blue', alpha=0.7)
+    plt.subplot(3, 2, 4)
+    plt.hist(history['similarity']['free_rider'], bins=20, color='blue', alpha=0.7)
     plt.title('Similarity Distribution\n(All Rounds)')
     plt.xlabel('Cosine Similarity')
     plt.ylabel('Frequency')
