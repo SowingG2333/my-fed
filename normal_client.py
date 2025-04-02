@@ -37,7 +37,11 @@ class NormalClient:
         
         # 损失函数和数据加载器
         self.criterion = nn.CrossEntropyLoss()
-        self.loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        self.loader = DataLoader(dataset, 
+                                 batch_size=batch_size, 
+                                 shuffle=True,
+                                 num_workers=24,
+                                 pin_memory=True)
         self.local_epochs = local_epochs
 
     def update_global_model(self, new_global_state):
@@ -61,7 +65,7 @@ class NormalClient:
         for _ in range(self.local_epochs):
             for X, y in self.loader:
                 # 将数据迁移到模型所在的设备
-                X, y = X.to(self.device), y.to(self.device)
+                X, y = X.to(self.device, non_blocking=True), y.to(self.device, non_blocking=True)
                 # 梯度清零
                 self.optimizer.zero_grad()
                 pred = self.local_model(X)

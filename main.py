@@ -35,47 +35,13 @@ def evaluate_model(model, dataloader, criterion, device='cpu'):
 import matplotlib.pyplot as plt
 import numpy as np
 
-def track_similarities(history, round_grads):
-    """记录搭便车者与归一化后的真实客户端平均梯度的余弦相似度"""
-    # 获取所有正常客户端的梯度
-    normal_grads = [grad.clone() for grad in round_grads['normal'].values()]
-    
-    # 跳过空梯度的情况
-    if len(normal_grads) == 0:
-        return
-    
-    # 1. 归一化每个正常客户端梯度
-    normalized_grads = []
-    for grad in normal_grads:
-        norm = grad.norm(p=2)
-        normalized_grads.append(grad / norm if norm > 0 else grad)
-    
-    # 2. 计算归一化后的平均梯度
-    avg_normal_grad = torch.stack(normalized_grads).mean(dim=0)
-    
-    # 3. 再次归一化平均梯度
-    avg_norm = avg_normal_grad.norm(p=2)
-    avg_normal_grad_normalized = avg_normal_grad / avg_norm if avg_norm > 0 else avg_normal_grad
-    
-    # 4. 处理搭便车者梯度
-    free_rider_grad = round_grads['free_rider'].clone()
-    fr_norm = free_rider_grad.norm(p=2)
-    free_rider_grad_normalized = free_rider_grad / fr_norm if fr_norm > 0 else free_rider_grad
-
-
-    # 5. 计算余弦相似度
-    adam_sim = torch.dot(avg_normal_grad_normalized, free_rider_grad_normalized).item()
-    history['similarity']['free_rider'].append(adam_sim)
-    cid = 0
-    for normal_grad in normalized_grads:
-        normal_sim = torch.dot(normal_grad, avg_normal_grad_normalized).item()
-        history['similarity']['normal'][cid].append(normal_sim)
-        cid += 1
-
 if __name__ == '__main__':
     # 初始化环境
     from fed_global import FedModel
     from normal_client import NormalClient
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"using {device} to train")
 
     global_model = FedModel()
     criterion = torch.nn.CrossEntropyLoss() 
@@ -90,13 +56,16 @@ if __name__ == '__main__':
     normal_clients = []
 
     num_clients = 5
-    diri_alpha = 0.9
-    client_datasets, test_dataset = data_generate(num_clients, diri_alpha, data_type='CIFAR10')
+    train_per = 0.75
+    diri_alpha = 0.5
+    client_datasets, test_dataset = data_generate(num_clients, train_per, diri_alpha, data_type='CIFAR10')
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
     for cid in range(num_clients):
-        normal_clients.append(NormalClient(cid, 
+        normal_clients.append(NormalClient(cid,
+                                        device, 
                                         global_model, 
-                                        lr=0.01, 
+                                        lr=0.01,
+                                        optimizer='Adam', 
                                         betas=(0.9, 0.999),
                                         eps=1e-8,
                                         batch_size=64, 
@@ -161,7 +130,34 @@ if __name__ == '__main__':
         round_grads['free_rider'] = last_layer_grad
         
         # 计算并存储相似度
-        track_similarities(history, round_grads)
+        normal_grads = [grad.clone() for grad in round_grads['normal'].values()]
+        
+        # 1. 归一化每个正常客户端梯度
+        normalized_grads = []
+        for grad in normal_grads:
+            norm = grad.norm(p=2)
+            normalized_grads.append(grad / norm if norm > 0 else grad)
+        
+        # 2. 计算归一化后的平均梯度
+        avg_normal_grad = torch.stack(normalized_grads).mean(dim=0)
+        
+        # 3. 再次归一化平均梯度
+        avg_norm = avg_normal_grad.norm(p=2)
+        avg_normal_grad_normalized = avg_normal_grad / avg_norm if avg_norm > 0 else avg_normal_grad
+        
+        # 4. 处理搭便车者梯度
+        free_rider_grad = round_grads['free_rider'].clone()
+        fr_norm = free_rider_grad.norm(p=2)
+        free_rider_grad_normalized = free_rider_grad / fr_norm if fr_norm > 0 else free_rider_grad
+
+        # 5. 计算余弦相似度
+        adam_sim = torch.dot(avg_normal_grad_normalized.to(device), free_rider_grad_normalized.to(device)).item()
+        history['similarity']['free_rider'].append(adam_sim)
+        cid = 0
+        for normal_grad in normalized_grads:
+            normal_sim = torch.dot(normal_grad, avg_normal_grad_normalized).item()
+            history['similarity']['normal'][cid].append(normal_sim)
+            cid += 1
 
     # 修正后的可视化代码
     plt.figure(figsize=(15, 12))
