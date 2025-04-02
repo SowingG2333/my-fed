@@ -1,4 +1,4 @@
-from fed_global import FedModel, data_generate
+from fed_global import MNIST_Net, Fashion_Net, CIFAR10_AlexNet, data_generate
 from adam_FR import AdamFreeRider
 from normal_client import NormalClient
 from torch.utils.data import DataLoader
@@ -37,13 +37,10 @@ import numpy as np
 
 if __name__ == '__main__':
     # 初始化环境
-    from fed_global import FedModel
-    from normal_client import NormalClient
-
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda:7' if torch.cuda.is_available() else 'cpu'
     print(f"using {device} to train")
 
-    global_model = FedModel()
+    global_model = Fashion_Net()
     criterion = torch.nn.CrossEntropyLoss() 
     free_rider = AdamFreeRider(
         cid=0,
@@ -58,18 +55,18 @@ if __name__ == '__main__':
     num_clients = 5
     train_per = 0.75
     diri_alpha = 0.5
-    client_datasets, test_dataset = data_generate(num_clients, train_per, diri_alpha, data_type='CIFAR10')
+    client_datasets, test_dataset = data_generate(num_clients, train_per, diri_alpha, data_type='FashionMNIST')
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
     for cid in range(num_clients):
         normal_clients.append(NormalClient(cid,
                                         device, 
                                         global_model, 
                                         lr=0.01,
-                                        optimizer='Adam', 
+                                        optimizer='SGD', 
                                         betas=(0.9, 0.999),
                                         eps=1e-8,
-                                        batch_size=64, 
-                                        local_epochs=10, 
+                                        batch_size=256, 
+                                        local_epochs=1, 
                                         dataset=client_datasets[cid]))
     
     # 修正后的数据存储结构
