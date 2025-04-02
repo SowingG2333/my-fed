@@ -90,8 +90,8 @@ if __name__ == '__main__':
     normal_clients = []
 
     num_clients = 5
-    diri_alpha = 0.1
-    client_datasets, test_dataset = data_generate(num_clients, diri_alpha)
+    diri_alpha = 0.9
+    client_datasets, test_dataset = data_generate(num_clients, diri_alpha, data_type='CIFAR10')
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
     for cid in range(num_clients):
         normal_clients.append(NormalClient(cid, 
@@ -100,7 +100,7 @@ if __name__ == '__main__':
                                         betas=(0.9, 0.999),
                                         eps=1e-8,
                                         batch_size=64, 
-                                        local_epochs=1, 
+                                        local_epochs=10, 
                                         dataset=client_datasets[cid]))
     
     # 修正后的数据存储结构
@@ -140,7 +140,7 @@ if __name__ == '__main__':
         aggregated_state_dict = {}
         for param_name in client_updates[0].keys():
             param_list = [client_state[param_name] for client_state in client_updates]
-            aggregated_state_dict[param_name] = torch.stack(param_list).mean(dim=0)
+            aggregated_state_dict[param_name] = torch.stack(param_list).float().mean(dim=0)
         global_model.load_state_dict(aggregated_state_dict)
         
         # 模型评估
