@@ -2,7 +2,7 @@ import copy
 import torch
 import torch.optim as optim
 
-class AdamFreeRiderSimple:
+class SimpleAdamFreeRider:
     """模拟联邦学习中基于Adam优化器 每轮输入随机噪声梯度并返回最后一层参数的搭便车节点"""
     def __init__(self, cid, global_model, lr, adam_params):
         self.cid = cid
@@ -55,6 +55,7 @@ class AdamFreeRiderSimple:
 class AdamFreeRider:
     """模拟联邦学习中基于Adam优化器 每轮全局模型更新梯度并返回最后一层参数的搭便车节点"""
     def __init__(self, cid, global_model, lr, betas, eps, sigma_n):
+        # 初始化cid、全局模型、本地模型、首轮生成的噪声标准差
         self.cid = cid
         self.global_model = copy.deepcopy(global_model)
         self.local_model = copy.deepcopy(global_model)
