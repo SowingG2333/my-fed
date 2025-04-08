@@ -40,7 +40,7 @@ class NormalClient:
         self.loader = DataLoader(dataset, 
                                  batch_size=batch_size, 
                                  shuffle=True,
-                                 num_workers=24,
+                                 num_workers=8,
                                  pin_memory=True)
         self.local_epochs = local_epochs
 

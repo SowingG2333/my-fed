@@ -58,7 +58,7 @@ class Fashion_Net(nn.Module):
             ResBlock(32, 64),                                     # 14x14 -> 14x14
             nn.MaxPool2d(2),                                      # 14x14 -> 7x7
             ResBlock(64, 128, stride=2),                          # 7x7 -> 4x4（进一步提取特征）
-            nn.AdaptiveAvgPool2d((1, 1))                           # 4x4 -> 1x1（替代全连接层）
+            nn.AdaptiveAvgPool2d((1, 1))                          # 4x4 -> 1x1（替代全连接层）
         )
         
         # 分类器（轻量设计）

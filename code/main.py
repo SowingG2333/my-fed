@@ -52,7 +52,7 @@ if __name__ == '__main__':
     )
     normal_clients = []
 
-    num_clients = 5
+    num_clients = 10
     train_per = 0.75
     diri_alpha = 0.5
     client_datasets, test_dataset = data_generate(num_clients, train_per, diri_alpha, data_type='FashionMNIST')
@@ -62,10 +62,10 @@ if __name__ == '__main__':
                                         device, 
                                         global_model, 
                                         lr=0.01,
-                                        optimizer='SGD', 
+                                        optimizer='Adam', 
                                         betas=(0.9, 0.999),
                                         eps=1e-8,
-                                        batch_size=256, 
+                                        batch_size=64, 
                                         local_epochs=1, 
                                         dataset=client_datasets[cid]))
     
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     }
 
     # 模拟联邦学习
-    for round_num in range(50):
+    for round_num in range(10):
         print(f"\n=== Round {round_num} ===")
         round_grads = {'normal': {}, 'free_rider': None}
         client_updates = []
@@ -163,6 +163,9 @@ if __name__ == '__main__':
     plt.subplot(3, 2, 1)
     for cid in range(num_clients):
         plt.plot(history['norms']['normal'][cid], 'b-', alpha=0.3)
+    # 绘制平均梯度范数
+    avg_norms = [np.mean([v[i] for v in history['norms']['normal'].values()]) for i in range(len(history['norms']['normal'][0]))]
+    plt.plot(avg_norms, 'g-', linewidth=2)
     plt.plot(history['norms']['free_rider'], 'r--', linewidth=2)
     plt.title('Gradient Norms\n(Blue: Normal Clients, Red: Free Rider)')
     plt.xlabel('Training Round')
@@ -172,6 +175,9 @@ if __name__ == '__main__':
     plt.subplot(3, 2, 2)
     for cid in range(num_clients):
         plt.plot(history['similarity']['normal'][cid], 'b-', alpha=0.3)
+    # 绘制平均相似度
+    avg_sims = [np.mean([v[i] for v in history['similarity']['normal'].values()]) for i in range(len(history['similarity']['normal'][0]))]
+    plt.plot(avg_sims, 'g-', linewidth=2)
     plt.plot(history['similarity']['free_rider'], 'r--', linewidth=2)
     plt.title('Cosine Similarity to Normalized Average\n(Blue: Normal Clients, Red: Free Rider)')
     plt.xlabel('Training Round')
