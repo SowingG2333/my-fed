@@ -98,33 +98,39 @@ if __name__ == '__main__':
 
     global_model = Fashion_Net()
     criterion = torch.nn.CrossEntropyLoss() 
-    free_rider = AdamFreeRider(
-        cid=0,
-        global_model=global_model,
-        lr=0.01,
-        betas=(0.9, 0.999),
-        eps=1e-8,
-        sigma_n=0.1
-    )
-    normal_clients = []
 
     num_clients = 10
     train_per = 0.75
     diri_alpha = 0.5
-    client_datasets, test_dataset = data_generate(num_clients, train_per, diri_alpha, data_type='FashionMNIST')
+    # 多生成一个公共数据集
+    client_datasets, test_dataset = data_generate(num_clients + 1, train_per, diri_alpha, data_type='FashionMNIST')
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
+
+    normal_clients = []
     for cid in range(num_clients):
         normal_clients.append(NormalClient(cid,
                                         device, 
                                         global_model, 
                                         lr=0.01,
-                                        optimizer='Adam', 
+                                        optimizer='Adam',
+                                        criterion=criterion, 
                                         betas=(0.9, 0.999),
                                         eps=1e-8,
                                         batch_size=64, 
                                         local_epochs=1, 
                                         dataset=client_datasets[cid]))
-    
+
+    free_rider = AdamFreeRider(num_clients,
+                               device,
+                               public_dataset=client_datasets[num_clients],
+                               global_model=global_model,
+                               criterion=criterion,
+                               lr=0.01,
+                               batch_size=64,
+                               betas=(0.9, 0.999),
+                               eps=1e-8,
+                               sigma_n=0.1)
+
     # 修正后的数据存储结构
     history = {
         'norms': {

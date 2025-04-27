@@ -4,11 +4,15 @@ import torch.optim as optim
 
 class AdamFreeRider:
     """模拟联邦学习中基于Adam优化器 每轮全局模型更新梯度并返回最后一层参数的搭便车节点"""
-    def __init__(self, cid, global_model, lr, betas, eps, sigma_n):
+    def __init__(self, cid, device, public_dataset, global_model, criterion, lr, batch_size, betas, eps, sigma_n):
         # 初始化cid、全局模型、本地模型、首轮生成的噪声标准差
         self.cid = cid
+        self.device = device
+        self.public_dataset = public_dataset
         self.global_model = copy.deepcopy(global_model)
         self.local_model = copy.deepcopy(global_model)
+        self.criterion = criterion
+        self.batch_size = batch_size
         self.sigma_n = sigma_n
 
         # 保存前一轮次的本地参数
@@ -47,8 +51,22 @@ class AdamFreeRider:
         # 生成虚假梯度
         for name, param in self.local_model.named_parameters():
             if round_num == 0:
-                noise = torch.normal(mean=0, std=self.sigma_n, size=param.size())
-                fake_grad = noise
+                # noise = torch.normal(mean=0, std=self.sigma_n, size=param.size())
+                # fake_grad = noise
+
+                # 使用公共数据集训练本地模型
+                self.local_model.train()
+                for data, target in self.public_dataset:
+                    data, target = data.to(self.device), target.to(self.device)
+                    self.optimizer.zero_grad()
+                    output = self.local_model(data)
+                    loss = self.criterion(output, target)
+                    loss.backward()
+                    self.optimizer.step()
+                # 计算当前参数与上轮参数的差异
+                prev_param = self.prev_local_state[name].to(param.device)
+                fake_grad = param.data - prev_param
+
             else:
                 prev_param = self.prev_local_state[name].to(param.device)
                 fake_grad = param.data - prev_param
